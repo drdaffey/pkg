@@ -1,0 +1,25 @@
+#!/bin/bash
+case "$1" in
+	"autoremove")xbps-remove -o;;
+	"clean")xbps-remove -Oo;;
+	"install")xbps-install "${@:2}";;
+	"list"|"query")
+		case "$2" in
+			"all")xbps-query -l;;
+			"manual"|"installed")xbps-query -m;;
+			"alternatives")xbps-alternatives -l "${@:3}";;
+			*)xbps-query $3;;
+		esac
+;;
+	"purge")xbps-remove -R "${@:2}";;
+	"reconfigure")xbps-reconfigure "${@:2}";;
+	"remove")xbps-remove "${@:2}";;
+	"search")xbps-query -Rs $2;;
+	"update")xbps-install -S;;
+	"upgrade")xbps-install -Su;;
+	*) state=("" "Fortified " "Bloody " "Exceptional " "Forsaken " "Fool's  " "Crude " "Terrifying " "Bronze " "Arcadian " "Bone " "Chromatic " "Shimmering " "Grandmaster's ")
+item=("Blade " "Scepter " "Hatchet " "Plate " "Buckler " "Treads " "Helm " "Amulet " "Crossbow " "Visor " "Spear " "Gloves " "Ring " "Dagger ")
+prefix=("of " "close to " "tragic as " "touched by " "owned by " "forged for " "aching for " "sought as " "gruesome as " "resembling " "calling " "worthy of " "loyal to " "driven by ")
+what=("Haste" "Torment" "the Sea" "Salvation" "Justice" "the Mountain" "the Desert" "the Forest" "Truth" "Carnage" "the Fox" "the Bear" "Bartuc" "Ureh")
+echo ${state[$RANDOM % ${#state[@]} ]}${item[$RANDOM % ${#item[@]} ]}${prefix[$RANDOM % ${#prefix[@]} ]}${what[$RANDOM % ${#what[@]} ]};;
+esac
