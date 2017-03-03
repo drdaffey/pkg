@@ -12,3 +12,5 @@ Remove: Removes a package.
 Search: Fuzzy search in database.  
 Update: Update database.  
 Upgrade: Install updates for all packages.  
+
+Disclaimer: Some names in error response generator may be copyright Blizzard.
