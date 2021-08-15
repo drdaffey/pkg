@@ -1,25 +1,130 @@
-#!/bin/bash
-case "$1" in
-	"autoremove")xbps-remove -o;;
-	"clean")xbps-remove -Oo;;
-	"install")xbps-install "${@:2}";;
-	"list"|"query")
-		case "$2" in
-			"all")xbps-query -l;;
-			"manual"|"installed")xbps-query -m;;
-			"alternatives")xbps-alternatives -l "${@:3}";;
-			*)xbps-query $3;;
-		esac
-;;
-	"purge")xbps-remove -R "${@:2}";;
-	"reconfigure")xbps-reconfigure "${@:2}";;
-	"remove")xbps-remove "${@:2}";;
-	"search")xbps-query -Rs $2;;
-	"update")xbps-install -S;;
-	"upgrade")xbps-install -Su;;
-	*) state=("" "Fortified " "Bloody " "Exceptional " "Forsaken " "Fool's  " "Crude " "Terrifying " "Bronze " "Arcadian " "Bone " "Chromatic " "Shimmering " "Grandmaster's ")
-item=("Blade " "Scepter " "Hatchet " "Plate " "Buckler " "Treads " "Helm " "Amulet " "Crossbow " "Visor " "Spear " "Gloves " "Ring " "Dagger ")
-prefix=("of " "close to " "tragic as " "touched by " "owned by " "forged for " "aching for " "sought as " "gruesome as " "resembling " "calling " "worthy of " "loyal to " "driven by ")
-what=("Haste" "Torment" "the Sea" "Salvation" "Justice" "the Mountain" "the Desert" "the Forest" "Truth" "Carnage" "the Fox" "the Bear" "Bartuc" "Ureh")
-echo ${state[$RANDOM % ${#state[@]} ]}${item[$RANDOM % ${#item[@]} ]}${prefix[$RANDOM % ${#prefix[@]} ]}${what[$RANDOM % ${#what[@]} ]};;
-esac
+#!/usr/bin/env bash
+
+## Universal package manager wrapper
+## manager[0] holds main package manager binary
+## List of actions similar to apt-get as described by the case statement
+
+if command -v 'xbps-install' 2>&1 > /dev/null;then
+	manager=( "xbps-install" "xbps-remove -o" "xbps-remove -Oo" "xbps-install" "xbps-query -l" "xbps-query -m" "xbps-query -L" "xbps-query" "xbps-remove -R" "xbps-reconfigure" "xbps-remove" "xbps-query -Rs" "xbps-query -L | awk '{print \"Available: \"$1\"\n\"\$2}' && xbps-query -l | wc -l | awk '{print \"Total installed: \"\$1}'" "xbps-install -S" "xbps-install -Su" )
+elif command -v 'apk' 2>&1 > /dev/null;then
+	manager=( "apk" "__ERROR" "apk cache -v clean" "apk add" "apk info -vv | sort" "apk info | sort" "grep ^[^#] /etc/apk/repositories" "apk info" "apk del" "apk fix" "apk del" "apk search" "apk stats" "apk update" "apk upgrade" )
+elif command -v 'zypper' 2>&1 > /dev/null;then
+	manager=( "zypper" "zypper rm -u" "zypper clean" "zypper in" "zypper search --installed-only" "zypper search --installed-only" "zypper lr" "zypper if" "zypper rm" "__ERROR" "zypper rm" "zypper se" "__ERROR" "zypper ref" "zypper up" )
+elif command -v 'dnf' 2>&1 > /dev/null;then
+	manager=( "dnf" "dnf autoremove" "dnf clean all" "dnf install" "dnf list installed" "dnf list installed -q" "find /etc/yum -type f -name *.repo" "dnf info" "dnf remove" "__ERROR" "dnf remove" "dnf search" "dnf -q list available | wc -l | awk '{print \"Available: \"\$1-1}' && dnf -q list installed | wc -l | awk '{print \"Total installed: \"\$1-1}'" "dnf clean expire-cache && dnf check-update" "dnf upgrade" )
+elif command -v 'pacman' 2>&1 > /dev/null;then
+	manager=( "pacman" "pacman -Qdtq | pacman -Rs -" "pacman -Scc" "pacman -S" "pacman -Q" "pacman -Qe" "grep ^[^#] /etc/pacman.d/mirrorlist" "pacman -Qi" "pacman -Rs" "__ERROR" "pacman -Rs" "pacman -Ss" "pacman -Sql | wc -l | awk '{print \"Available: \"\$1}' && pacman -Qq | wc -l | awk '{print \"Total installed: \"\$1}'" "pacman -Qu" "pacman -Syu"  )
+elif command -v 'emerge' 2>&1 > /dev/null;then
+	manager=( "emerge" "emerge -a --depclean" "__ERROR" "emerge" "qlist -I" "qlist -I" "source /etc/portage/make.conf; echo $PORTAGE_BINHOST" "emerge --info" "__ERROR" "__ERROR" "emerge -ca" "emerge --search" "__ERROR" "emerge --sync" "emerge --NuDa world" )
+elif command -v 'yum' 2>&1 > /dev/null;then
+	manager=( "yum" "__ERROR" "yum clean all" "yum install" "yum list installed" "yum list installed -q" "find /etc/yum -type f -name *.repo" "yum info" "yum remove" "__ERROR" "yum remove" "yum search" "yum -q list available | wc -l | awk '{print \"Available: \"\$1-1}' && yum -q list installed | wc -l | awk '{print \"Total installed: \"\$1-1}'" "yum clean all && yum check-update" "yum upgrade" )
+elif command -v 'apt' 2>&1 > /dev/null;then
+	manager=( "apt" "__ERROR" "echo 'Install deborphan for orphaned package removal.'" "apt install" "apt list --installed" "apt-mark showmanual | sort -u" "grep -r ^[^#] /etc/apt/sources.list*" "apt show" "apt purge" "dpkg-reconfigure" "apt remove" "apt search" "apt-cache pkgnames | wc -l | awk '{print \"Available: \"\$1}' && apt list --installed 2>/dev/null | wc -l | awk '{print \"Total installed: \"\$1}'" "apt update" "apt dist-upgrade" )
+fi
+
+__ERROR(){
+	eval ${manager[0]}
+	echo
+	echo -e "\e[31m[PKG] Package manager \"${manager[0]}\" does not provide this action.\e[0m"
+}
+
+__SLAK(){
+	echo 'Run me as root!'
+	local dlpath='/usr/src/'
+	local arc="$(uname -m)"
+	tr '>' '\n' <<< \
+	$(curl -s "http://slakfinder.org/index.php?act=search&start=0&order=&maxresult=30&repo=0&name=$1&desc=&file=#results") \
+	| grep -B1 download | grep -o "http.*$arc.*txz" | grep -m1 --color $1 | tee /tmp/pkg.slak
+	if [ $(wc -l < /tmp/pkg.slak) -lt 1 ];then
+		echo 'Cannot find package'
+		exit
+	fi
+	while :; do
+		echo -n 'Which one will it be? [enter line number]: '
+		read a
+		if [ $a -le $(wc -l < /tmp/pkg.slak) ];then
+			local link="$(sed -n "$a{p;q}" /tmp/pkg.slak)"
+			local pkg="$(awk -F/ '{print$NF}' <<< $link)"
+			curl -# -o $dlpath$pkg $link
+			echo 'Package downloaded'
+			break
+		else
+			break
+		fi
+	done
+
+}
+
+__SLACKONLY(){
+	echo 'Run me as root!';
+	local dlpath='/usr/src/'
+	local arc="$(uname -m)"
+	if [ ! -d /var/slackonly ]; then mkdir -p /var/slackonly || exit; fi
+	if [ ! -f /var/slackonly/packages ];then echo 'Fetching Slackonly package list...'; fi
+	curl -# -z /var/slackonly/packages.gz -o /var/slackonly/packages.gz "https://slackonly.com/pub/packages/current-$arc/PACKAGES.TXT.gz"
+	if [ ! -f /var/slackonly/packages ];then echo 'Fetched Slackonly package list.'; gunzip -c /var/slackonly/packages.gz > /var/slackonly/packages; fi
+	if grep -q $1 /var/slackonly/packages; then
+		grep "PACKAGE NAME.*$1" /var/slackonly/packages | awk '{print$NF}' | sort | tee /tmp/pkg.slak
+		echo
+		while :; do
+			echo -ne "Which one will it be? [enter line number]: "
+			read a
+			if [ $a -le $(wc -l < /tmp/pkg.slak) ] && [ $a -ne 0 ];then
+				local filename="$(sed -n "$a{p;q}" /tmp/pkg.slak)"
+				local package="$(grep -A2 -F "$filename" /var/slackonly/packages | grep 'PACKAGE LOCATION' | awk '{print$NF}')"
+				local url="$(grep -m1 'PACKAGE MIRROR' /var/slackonly/packages | awk '{print$NF}')"	
+				curl -L -# -o $dlpath$filename $url$package/$filename
+				echo 'Package downloaded.'
+				break
+			fi
+		done
+	else
+		echo 'Nothing found.'
+	fi
+}
+
+__PIMP(){
+	local state=("" "Fortified " "Bloody " "Exceptional " "Forsaken " "Fool's  " "Crude " "Terrifying " "Bronze " "Arcadian " "Bone " "Chromatic " "Shimmering " "Grandmaster's ")
+	local item=("Blade " "Scepter " "Hatchet " "Plate " "Buckler " "Treads " "Helm " "Amulet " "Crossbow " "Visor " "Spear " "Gloves " "Ring " "Dagger ")
+	local prefix=("of " "close to " "profound as " "touched by " "owned by " "forged for " "aching for " "sought as " "gruesome as " "resembling " "calling " "worthy of " "loyal to " "driven by ")
+	local what=("Haste" "Torment" "the Sea" "Salvation" "Justice" "the Mountain" "the Desert" "the Forest" "Truth" "Carnage" "the Fox" "the Bear" "Pheolaestidil" "Tyaerill")
+	echo ${state[$RANDOM % ${#state[@]} ]}${item[$RANDOM % ${#item[@]} ]}${prefix[$RANDOM % ${#prefix[@]} ]}${what[$RANDOM % ${#what[@]} ]}
+}
+
+if grep -q '^[-+]' <<< "${@:1}"; then
+	add="$(grep -ow '[-+][-a-zA-Z0-9]\+' <<< "${@:1}" | grep ^+ | sed 's/^[^a-zA-Z0-9]//' | tr '\n' ' ')"
+	del="$(grep -ow '[-+][-a-zA-Z0-9]\+' <<< "${@:1}" | grep ^\- | sed 's/^[^a-zA-Z0-9]//' | tr '\n' ' ')"
+	echo -n "Do you really want to install: ${add:-nothing }and remove: ${del:-nothing }[y/n] "
+	read a
+	if grep -q 'y' <<< $a; then
+		if [ ! -z "$add" ];then eval ${manager[3]} $add; fi
+		if [ ! -z "$del" ];then eval ${manager[10]} $del; fi
+	else
+		echo 'Quitting.'
+	fi
+elif grep -q '^[?]' <<< ${@:1}; then
+	wat="$(grep -ow -m1 '[?][-a-zA-Z0-9]\+' <<< "${@:1}" | sed 's/^[^a-zA-Z0-9]//')"
+	if [ ! -z "$wat" ];then eval ${manager[11]} $wat; fi
+else
+	case $1 in
+		"autoremove") eval ${manager[1]};;
+		"clean") eval ${manager[2]};;
+		"install"|"add"|"in") eval ${manager[3]} "${@:2}";;
+		"list"|"query"|"info"|"show")
+			case "$2" in
+				"all") eval ${manager[4]};;
+				"manual"|"installed") eval ${manager[5]};;
+				"repos")  eval ${manager[6]};;
+				*) eval ${manager[7]} $2;;
+			esac;;
+		"purge") eval ${manager[8]} "${@:2}";;
+		"reconfigure") eval ${manager[9]} "${@:2}";;
+		"remove"|"del"|"rm") eval ${manager[10]} "${@:2}";;
+		"search") eval ${manager[11]} $2;;
+		"slack") __SLACKONLY $2;;
+		"stats") eval ${manager[12]};;
+		"update") eval ${manager[13]};;
+		"upgrade") eval ${manager[14]};;
+		*) __PIMP;;
+	esac
+fi
