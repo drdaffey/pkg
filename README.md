@@ -1,5 +1,5 @@
 # pkg
-Tiny wrapper for Void Linux's package manager
+Tiny wrapper for various package managers
 
 Usage: pkg [autoremove|clean|install|(list|query)|purge|reconfigure|remove|search|update|upgrade] {QUERY}  
 Autoremove: Clean orphaned packages.  
